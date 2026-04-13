@@ -1,0 +1,24 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info/
+
+# Virtual environments
+.venv/
+
+# OS / editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Local Python version
+.python-version
+
+# Generated artifacts
+vishing/artifacts/
+
+# Optional local datasets / large files
+Задание_ML.pdf

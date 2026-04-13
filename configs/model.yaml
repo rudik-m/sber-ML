@@ -1,0 +1,23 @@
+training:
+  random_state: 42
+  validation_size: 0.25
+  max_split_attempts: 100
+
+logreg:
+  max_iter: 4000
+  C: 1.0
+  class_weight: "balanced"
+  solver: "liblinear"
+
+catboost:
+  iterations: 300
+  depth: 4
+  learning_rate: 0.05
+  l2_leaf_reg: 3.0
+  loss_function: "Logloss"
+  eval_metric: "AUC"
+  verbose: false
+
+ensemble:
+  weight_logreg: 0.7
+  weight_catboost: 0.3

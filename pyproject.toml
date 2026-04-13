@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vishing-asr"
+version = "0.2.0"
+description = "Офлайн-пайплайн для распознавания мошеннических разговоров."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "catboost>=1.2.8,<2",
+    "click>=8.1,<9",
+    "faster-whisper>=1.1.0,<2",
+    "joblib>=1.4,<2",
+    "librosa>=0.10,<1",
+    "numpy>=2.0,<3",
+    "pandas>=2.2,<3",
+    "pyyaml>=6.0,<7",
+    "rich>=13.7,<15",
+    "scikit-learn>=1.5,<2",
+    "scipy>=1.13,<2",
+    "soundfile>=0.12,<1",
+    "tqdm>=4.66,<5",
+]
+
+[project.scripts]
+vishing = "vishing.cli:main"
+vishing-asr = "vishing_asr.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vishing", "src/vishing_asr"]
+
+[tool.uv]
+package = true

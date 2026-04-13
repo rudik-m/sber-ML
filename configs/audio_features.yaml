@@ -1,0 +1,7 @@
+sample_rate: 16000
+frame_length: 1024
+hop_length: 512
+energy_quantile: 0.2
+energy_threshold_scale: 1.4
+min_rms_threshold: 0.0005
+min_pause_duration_sec: 0.3

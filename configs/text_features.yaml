@@ -1,0 +1,28 @@
+normalization:
+  collapse_whitespace: true
+  replace_yo: true
+  remove_technical_symbols_regex: "[\\[\\]{}<>|*_#^~]+"
+
+suspicious_imperatives:
+  - "срочно"
+  - "переведите"
+  - "переведи"
+  - "подтвердите"
+  - "назовите"
+  - "скажите"
+  - "сообщите"
+  - "продиктуйте"
+  - "нажмите"
+  - "оставайтесь"
+  - "не отключайтесь"
+
+word_tfidf:
+  ngram_range: [1, 2]
+  min_df: 1
+  max_features: 2000
+
+char_tfidf:
+  ngram_range: [3, 5]
+  min_df: 1
+  max_features: 4000
+  analyzer: "char_wb"
