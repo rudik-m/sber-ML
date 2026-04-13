@@ -1,30 +1,38 @@
 # Vishing Pipeline
 
-Офлайн-проект для задачи распознавания мошеннических разговоров.
+Проект решает задачу распознавания мошеннических телефонных разговоров по аудиозаписям `.wav`.
 
-Идея решения простая: сначала разговор переводится из аудио в текст, затем из текста и аудио извлекаются признаки, после чего модель определяет, является ли разговор мошенническим.
-
-Пайплайн устроен так:
-
-1. `wav -> transcript`
-2. нормализация текста
-3. словарь триггеров и regex-паттерны
-4. text/audio handcrafted features
-5. baseline `LogisticRegression`
-6. основная модель `CatBoost`
-7. ансамбль вероятностей
-8. inference по папке с итоговым `predictions.csv`
-
-Проект не использует платные API, облачные сервисы или тяжёлые end-to-end DL-классификаторы.
-
-## Суть задания
-
-Проект решает задачу бинарной классификации телефонных разговоров:
+Классы в задаче заданы так:
 
 - `0` — разговор мошеннический
 - `1` — разговор не мошеннический
 
-На вход подаётся папка с `.wav`-файлами, на выходе формируется `predictions.csv` в формате:
+Решение реализовано на Python и работает локально, без платных API и облачных сервисов.
+
+## Что Делает Проект
+
+На вход подаётся папка с аудиофайлами. Далее пайплайн:
+
+1. переводит речь в текст с помощью ASR
+2. нормализует транскрипт
+3. извлекает текстовые и аудио-признаки
+4. применяет обученную модель
+5. сохраняет итоговый `predictions.csv`
+
+Основная идея проекта: главный сигнал в задаче содержится в тексте разговора, поэтому решение строится вокруг ASR, словаря триггеров, regex-паттернов и простых интерпретируемых признаков.
+
+## Соответствие Постановке Задачи
+
+Итоговый сценарий соответствует требованиям:
+
+- алгоритм реализован на Python
+- используются только открытые локальные библиотеки и модели
+- на вход подаётся папка с `.wav`
+- на выходе формируется CSV в формате `filename,label`
+- обучение выполняется только на `samples`
+- папка `test` используется только для инференса и не участвует в обучении
+
+Формат итогового файла:
 
 ```csv
 filename,label
@@ -32,75 +40,27 @@ out_d_19.wav,0
 Nout_b_32.wav,1
 ```
 
-Итоговый сценарий соответствует постановке задачи:
+## Архитектура Решения
 
-- алгоритм реализован на Python
-- используются только локальные открытые модели и библиотеки
-- обработка идёт по папке с файлами
-- результат возвращается в CSV-формате
-- обучение выполняется только на `samples`, а `test` используется только для инференса
+Пайплайн устроен так:
 
-## Быстрый старт
+1. `wav -> transcript`
+2. нормализация текста
+3. trigger features и regex-pattern features
+4. text meta-features и простые audio stats
+5. обучение нескольких моделей
+6. ансамбль вероятностей
+7. inference по папке с файлами
 
-Если нужно просто запустить решение целиком, достаточно такого сценария:
+Используемые модели:
 
-```bash
-uv sync
-uv run vishing transcribe --input-dir ./vishing
-uv run vishing build-features --input-dir ./vishing
-uv run vishing train-all --features ./vishing/artifacts/features/features.csv
-uv run vishing predict --input-dir ./vishing/test --model ensemble
-```
+- `LogisticRegression` как baseline
+- `CatBoost` как табличная модель на dense-признаках
+- `Ensemble` как итоговая модель по умолчанию
 
-Главный результат будет сохранён в:
+ASR-часть построена на `faster-whisper`.
 
-- `vishing/artifacts/predictions/predictions.csv`
-
-## Результаты
-
-Финальный пайплайн использует `faster-whisper` для ASR, handcrafted text/audio features и три модели-кандидата:
-
-- `LogisticRegression`
-- `CatBoost`
-- ансамбль вероятностей `0.7 * logreg + 0.3 * catboost`
-
-Актуальные метрики на честной group-based validation по `samples`:
-
-| Model | Accuracy | Precision (Fraud) | Recall (Fraud) | F1 (Fraud) | ROC-AUC |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Logistic Regression | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
-| CatBoost | 0.5000 | 0.2500 | 1.0000 | 0.4000 | 1.0000 |
-| Ensemble | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
-
-Итоговый выбор для inference по умолчанию — `ensemble`.
-
-Важно: валидация считается только на `samples`, а сам validation-fold маленький, поэтому эти метрики нужно интерпретировать как результат на текущем учебном наборе, а не как окончательную оценку на большой скрытой выборке.
-
-## Проверка времени
-
-Требование задания: обработка одной записи не должна превышать `3 минуты`.
-
-По реальным замерам на текущем CPU-прогоне проекта:
-
-- транскрибация `100` файлов заняла около `5 минут 29 секунд`, то есть в среднем около `3.3 секунды` на запись
-- построение признаков `100` файлов заняло около `40 секунд`, то есть около `0.4 секунды` на запись
-- inference по `60` тестовым файлам занял около `14 секунд`, то есть около `0.25 секунды` на запись после построения признаков
-- полный путь для новой записи с ASR укладывается примерно в `5-7 секунд` на запись
-
-Следовательно, ограничение по времени выполняется с большим запасом.
-
-## Основные файлы
-
-- `src/vishing/cli.py` — единый CLI пайплайна
-- `src/vishing_asr/transcribe.py` — этап `wav -> transcript`
-- `src/vishing/features/build.py` — сборка `features.csv`
-- `src/vishing/models/train_logreg.py` — обучение baseline `LogisticRegression`
-- `src/vishing/models/train_catboost.py` — обучение `CatBoost`
-- `src/vishing/models/ensemble.py` — ансамбль вероятностей
-- `src/vishing/models/predict.py` — inference и сохранение `predictions.csv`
-- `docs/architecture_ru.md` — краткое описание архитектуры решения
-
-## Структура каталогов
+## Структура Репозитория
 
 ```text
 repo/
@@ -116,144 +76,127 @@ repo/
     └── artifacts/
 ```
 
-Основные артефакты:
+Основные каталоги:
 
-- `vishing/artifacts/transcripts/` — тексты и сегменты ASR
-- `vishing/artifacts/features/` — `features.csv`
-- `vishing/artifacts/models/` — модели, threshold, config, validation predictions
-- `vishing/artifacts/predictions/` — `predictions.csv` и `predictions_debug.csv`
-- `vishing/artifacts/reports/` — markdown/json-отчёты
+- `configs/` — YAML-конфиги признаков, паттернов и моделей
+- `src/vishing/` — основной ML-пайплайн
+- `src/vishing_asr/` — этап транскрибации аудио
+- `tests/` — unit-тесты
+- `vishing/samples/` — обучающая выборка
+- `vishing/test/` — папка для инференса
+- `vishing/artifacts/` — все промежуточные и итоговые артефакты
 
-## Требования
+## Основные Файлы
 
-- `uv`
-- Python `3.11` или `3.12`
-- локальный запуск без облачных сервисов
-
-Для текущего набора `.wav` отдельная установка `ffmpeg` не требуется. На первом запуске `faster-whisper` скачивает открытые веса модели Whisper в локальный кэш.
+- `src/vishing/cli.py` — единый CLI пайплайна
+- `src/vishing_asr/transcribe.py` — ASR-этап `wav -> transcript`
+- `src/vishing/features/build.py` — построение `features.csv`
+- `src/vishing/models/train_logreg.py` — обучение `LogisticRegression`
+- `src/vishing/models/train_catboost.py` — обучение `CatBoost`
+- `src/vishing/models/ensemble.py` — ансамблирование моделей
+- `src/vishing/models/predict.py` — inference и сохранение предсказаний
+- `docs/architecture_ru.md` — архитектура решения
+- `docs/features_ru.md` — описание признаков
+- `docs/usage_ru.md` — сценарии использования
+- `docs/experiments_ru.md` — эксперименты и валидация
 
 ## Установка
+
+Требования:
+
+- Python `3.11` или `3.12`
+- `uv`
+
+Установка зависимостей:
 
 ```bash
 uv sync
 ```
 
-## CLI-команды
+Для текущего набора `.wav` отдельная установка `ffmpeg` не требуется. При первом запуске `faster-whisper` скачивает открытые веса модели в локальный кэш.
 
-Проверить входные данные и артефакты:
+## Как Запустить Решение
+
+### 1. Проверка структуры проекта
 
 ```bash
 uv run vishing inspect --input-dir ./vishing
 ```
 
-Существующий этап транскрибации:
+Команда показывает:
+
+- сколько найдено аудиофайлов
+- как они распределены по `samples/test`
+- сколько строк уже есть в `transcripts.csv`
+- есть ли `features.csv`
+- какие модели уже обучены
+
+### 2. Транскрибация аудио
+
+Полный прогон:
 
 ```bash
 uv run vishing transcribe --input-dir ./vishing
 ```
 
-Быстрый smoke-check ASR:
+Быстрая проверка:
 
 ```bash
 uv run vishing-asr transcribe --input-dir ./vishing --limit 3
 ```
 
-Построить признаки:
+### 3. Построение признаков
 
 ```bash
 uv run vishing build-features --input-dir ./vishing
 ```
 
-Сокращённая проверка:
+Если транскриптов не хватает, команда по умолчанию дозапускает ASR для недостающих файлов без перезаписи уже готовых артефактов.
 
-```bash
-uv run vishing build-features --input-dir ./vishing --limit 5
-```
-
-Обучить baseline:
+### 4. Обучение моделей
 
 ```bash
 uv run vishing train-logreg --features ./vishing/artifacts/features/features.csv
-```
-
-Обучить CatBoost:
-
-```bash
 uv run vishing train-catboost --features ./vishing/artifacts/features/features.csv
-```
-
-Обучить всё сразу:
-
-```bash
 uv run vishing train-all --features ./vishing/artifacts/features/features.csv
 ```
 
-Сокращённый train-check:
+Важно: даже если `features.csv` был построен по всему каталогу `./vishing`, обучение использует только строки со `split=samples`.
 
-```bash
-uv run vishing train-all --features ./vishing/artifacts/features/features.csv --limit 20
-```
-
-Сделать предсказание:
+### 5. Предсказание по папке
 
 ```bash
 uv run vishing predict --input-dir ./vishing/test --model ensemble
 ```
 
-Собрать отчёты:
+Также можно выбрать конкретную модель:
+
+```bash
+uv run vishing predict --input-dir ./vishing/test --model logreg
+uv run vishing predict --input-dir ./vishing/test --model catboost
+```
+
+### 6. Построение отчётов
 
 ```bash
 uv run vishing report --input-dir ./vishing
 ```
 
-## Рекомендуемый порядок запуска
+## Полный Сценарий Запуска
 
-1. `uv sync`
-2. `uv run vishing inspect --input-dir ./vishing`
-3. `uv run vishing transcribe --input-dir ./vishing`
-4. `uv run vishing build-features --input-dir ./vishing`
-5. `uv run vishing train-all --features ./vishing/artifacts/features/features.csv`
-6. `uv run vishing predict --input-dir ./vishing/test --model ensemble`
-7. `uv run vishing report --input-dir ./vishing`
+```bash
+uv sync
+uv run vishing inspect --input-dir ./vishing
+uv run vishing transcribe --input-dir ./vishing
+uv run vishing build-features --input-dir ./vishing
+uv run vishing train-all --features ./vishing/artifacts/features/features.csv
+uv run vishing predict --input-dir ./vishing/test --model ensemble
+uv run vishing report --input-dir ./vishing
+```
 
-Если транскриптов не хватает, `build-features` и `predict` по умолчанию пытаются дозапустить ASR-этап без перезаписи уже готовых `.txt/.json`.
+## Что Получается На Выходе
 
-Важно: обучение использует только строки со `split=samples`, даже если `features.csv` был построен по всему каталогу `./vishing`. Папка `test` предназначена для инференса и не участвует в fit моделей.
-
-## Что лежит в `features.csv`
-
-В датасете признаков есть:
-
-- идентификаторы файла: `filepath`, `filename`, `split`, `label_dir`, `label`, `group_id`
-- `transcript_raw` и `transcript_norm`
-- trigger features
-- pattern features
-- текстовые meta-features
-- лёгкие audio stats
-
-Маппинг классов фиксирован:
-
-- `Fraud -> 0`
-- `NotFraud -> 1`
-
-Этот mapping явно соблюдается и в обучении, и в инференсе.
-
-## Что сохраняется для моделей
-
-Для каждой модели сохраняются:
-
-- бинарный артефакт модели
-- `config.yaml`
-- `threshold.json`
-- `metrics.json`
-- `validation_predictions.csv`
-- markdown-отчёт в `vishing/artifacts/reports/`
-
-Для `LogisticRegression` также сохраняются TF-IDF vectorizers и scaler.
-
-## Что получает пользователь на выходе
-
-Главный файл для задачи:
+Главный итоговый файл:
 
 - `vishing/artifacts/predictions/predictions.csv`
 
@@ -269,16 +212,84 @@ Nout_b_32.wav,1
 
 - `vishing/artifacts/predictions/predictions_debug.csv`
 
-Он содержит нормализованный текст, `fraud_score`, выбранный threshold и сработавшие триггеры.
+Он содержит:
 
-## Ограничения текущей версии
+- нормализованный текст
+- `fraud_score`
+- выбранный threshold
+- сработавшие триггеры
 
-- основной сигнал идёт из ASR-текста; качество распознавания влияет на классификацию
-- используется простой energy-based VAD, без диаризации и без нейросетевых audio-моделей
-- в `CatBoost` сейчас подаются только dense handcrafted features, без SVD поверх TF-IDF
-- датасет маленький, поэтому честная group-based validation важнее агрессивного усложнения модели
+## Какие Артефакты Сохраняются
 
-## Подробная документация
+Транскрипты:
+
+- `vishing/artifacts/transcripts/transcripts.csv`
+- `.txt` и `.json` для отдельных файлов
+
+Признаки:
+
+- `vishing/artifacts/features/features.csv`
+
+Модели:
+
+- бинарный артефакт модели
+- `config.yaml`
+- `threshold.json`
+- `metrics.json`
+- `validation_predictions.csv`
+
+Отчёты:
+
+- `vishing/artifacts/reports/metrics_summary.md`
+- `vishing/artifacts/reports/error_analysis.md`
+- `vishing/artifacts/reports/feature_overview.md`
+
+## Результаты
+
+Финальный пайплайн использует:
+
+- `faster-whisper` для ASR
+- handcrafted text/audio features
+- `LogisticRegression`
+- `CatBoost`
+- ансамбль `0.7 * logreg + 0.3 * catboost`
+
+Актуальные метрики на честной group-based validation по `samples`:
+
+| Model | Accuracy | Precision (Fraud) | Recall (Fraud) | F1 (Fraud) | ROC-AUC |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Logistic Regression | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+| CatBoost | 0.5000 | 0.2500 | 1.0000 | 0.4000 | 1.0000 |
+| Ensemble | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
+
+Итоговая модель для inference по умолчанию — `ensemble`.
+
+Важно: validation-fold на `samples` маленький, поэтому эти числа нужно интерпретировать как результат на текущем учебном наборе, а не как окончательную оценку на большой скрытой выборке.
+
+## Проверка Времени
+
+Требование задания: обработка одной записи не должна превышать `3 минуты`.
+
+По реальным замерам на текущем CPU-прогоне:
+
+- транскрибация `100` файлов заняла около `5 минут 29 секунд`
+- это даёт в среднем около `3.3 секунды` на запись
+- построение признаков `100` файлов заняло около `40 секунд`
+- это около `0.4 секунды` на запись
+- inference по `60` тестовым файлам занял около `14 секунд`
+- это около `0.25 секунды` на запись после построения признаков
+- полный путь для новой записи с ASR укладывается примерно в `5-7 секунд` на запись
+
+Следовательно, ограничение по времени выполняется с большим запасом.
+
+## Ограничения Текущей Версии
+
+- основной сигнал идёт из ASR-текста, поэтому качество распознавания влияет на итоговую классификацию
+- используется простой energy-based VAD, без диаризации и без тяжёлых аудио-моделей
+- `CatBoost` работает только на dense handcrafted-признаках
+- датасет маленький, поэтому оценка качества нестабильна
+
+## Подробная Документация
 
 - [Архитектура](docs/architecture_ru.md)
 - [Признаки](docs/features_ru.md)
