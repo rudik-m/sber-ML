@@ -54,6 +54,8 @@ uv run vishing build-features --input-dir ./vishing --no-run-transcribe-missing
 uv run vishing train-logreg --features ./vishing/artifacts/features/features.csv
 ```
 
+Команда обучает модель на размеченных строках из `features.csv`.
+
 С ограничением по числу строк:
 
 ```bash
