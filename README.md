@@ -295,7 +295,3 @@ Nout_b_32.wav,1
 - [Признаки](docs/features_ru.md)
 - [Использование](docs/usage_ru.md)
 - [Эксперименты и валидация](docs/experiments_ru.md)
-
-## Отчёт
-
-Подробное описание решения приведено в файле `report.pdf`.
